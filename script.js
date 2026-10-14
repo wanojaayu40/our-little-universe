@@ -82,31 +82,69 @@ function createHeartBurst(amount) {
   }
 }
 
-// Tombol musik tidak memutar audio otomatis. Pengunjung bisa memilih file musik sendiri
-// jika ingin menambahkan audio pada proyek ini.
+// Musik hanya boleh diputar setelah ada interaksi pengguna, sesuai aturan browser.
+// Untuk halaman lokal/file://, cara paling aman adalah memulai audio saat user
+// mengeklik tombol atau bahkan klik di area halaman.
 
 const backgroundMusic = document.querySelector("#backgroundMusic");
+let musicReady = false;
+
+function setMusicButtonState(isPlaying) {
+  musicButton.setAttribute("aria-pressed", String(isPlaying));
+  musicButton.querySelector("span").textContent = isPlaying ? "Musik: menyala" : "Musik: mati";
+}
+
+async function startMusic() {
+  if (!backgroundMusic) {
+    showToast("File musik tidak ditemukan.");
+    return false;
+  }
+
+  if (!musicReady) {
+    backgroundMusic.preload = "auto";
+    backgroundMusic.volume = 0.45;
+    backgroundMusic.load();
+    musicReady = true;
+  }
+
+  try {
+    backgroundMusic.muted = false;
+    await backgroundMusic.play();
+    setMusicButtonState(true);
+    showToast("Musik romantis diputar ♡");
+    return true;
+  } catch (error) {
+    console.error("Gagal memutar musik:", error);
+    backgroundMusic.pause();
+    backgroundMusic.currentTime = 0;
+    setMusicButtonState(false);
+    showToast("Klik tombol lagi untuk memutar musik.");
+    return false;
+  }
+}
+
+async function stopMusic() {
+  if (!backgroundMusic) return;
+  backgroundMusic.pause();
+  setMusicButtonState(false);
+  showToast("Musik dijeda ♡");
+}
 
 musicButton.addEventListener("click", async () => {
-  if (backgroundMusic.paused) {
-    try {
-      await backgroundMusic.play();
-
-      musicButton.setAttribute("aria-pressed", "true");
-      musicButton.querySelector("span").textContent = "Musik: menyala";
-      showToast("Musik romantis diputar ♡");
-    } catch (error) {
-      showToast("Musik gagal diputar. Periksa file MP3 kamu.");
-      console.error("Gagal memutar musik:", error);
-    }
-  } else {
-    backgroundMusic.pause();
-
-    musicButton.setAttribute("aria-pressed", "false");
-    musicButton.querySelector("span").textContent = "Musik: mati";
-    showToast("Musik dijeda ♡");
+  if (backgroundMusic && !backgroundMusic.paused) {
+    await stopMusic();
+    return;
   }
+
+  await startMusic();
 });
+
+document.addEventListener("pointerdown", () => {
+  if (!backgroundMusic || !backgroundMusic.paused) return;
+  if (musicButton.getAttribute("aria-pressed") === "true") return;
+  backgroundMusic.currentTime = 0;
+  startMusic();
+}, { once: true });
 
 
 // Efek muncul saat bagian halaman masuk ke layar.
